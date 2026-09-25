@@ -146,17 +146,36 @@ def organize_content(rendered: str) -> tuple[str, list[Chapter]]:
 
 
 def build_toc(chapters: list[Chapter]) -> str:
+    """Sumário no padrão do ebook Well-Architected: faixa por capítulo e itens numerados."""
     groups: list[str] = []
     for chapter in chapters:
         heading = chapter.heading
-        links = [f'<li><a href="#{heading.anchor}">Ir para {html.escape(heading.title)}</a></li>']
+        numbered = re.match(r"^(\d+)\.\s+(.*)$", heading.title)
+        number = numbered.group(1) if numbered else None
+        label = f"Capítulo {number} — {numbered.group(2)}" if numbered else heading.title
+        if not chapter.children:
+            groups.append(
+                '<div class="toc-group">'
+                f'<a class="toc-group-title" href="#{heading.anchor}">{html.escape(label)}</a></div>'
+            )
+            continue
+        links: list[str] = []
+        section = 0
         for child in chapter.children:
-            level_class = " class=\"toc-topic\"" if child.level == 4 else ""
-            links.append(f'<li{level_class}><a href="#{child.anchor}">{html.escape(child.title)}</a></li>')
+            if child.level == 3:
+                section += 1
+                n = f"{number}.{section}" if number else ""
+                links.append(
+                    f'<li><a href="#{child.anchor}"><span class="n">{n}</span> {html.escape(child.title)}</a></li>'
+                )
+            else:
+                links.append(
+                    f'<li class="toc-topic"><a href="#{child.anchor}"><span class="n"></span> {html.escape(child.title)}</a></li>'
+                )
         groups.append(
             '<details class="toc-group">'
-            f'<summary>{html.escape(heading.title)}</summary>'
-            '<ul>' + "".join(links) + '</ul></details>'
+            f'<summary class="toc-group-title">{html.escape(label)}</summary>'
+            '<ul class="toc-list">' + "".join(links) + '</ul></details>'
         )
     return "\n".join(groups)
 
@@ -198,7 +217,8 @@ CSS = r"""
   .cover-top,.cover-bottom-label{font:700 .75rem/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink)}
   .cover-top{display:flex;justify-content:space-between;gap:20px}
   .cover-main{align-self:center;max-width:690px}
-  .cover-code{display:block;font:700 clamp(4rem,11vw,7.1rem)/.98 var(--mono);letter-spacing:-.085em;color:var(--ink);margin:0 0 28px}
+  .cover-code{display:block;font:700 clamp(4rem,11vw,7.1rem)/.98 var(--mono);letter-spacing:-.085em;color:var(--ink);margin:0 0 14px}
+  .cover-exam{display:block;font:700 .95rem/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);margin:0 0 30px}
   .cover-main h1{font-size:clamp(2rem,4.4vw,3rem);font-weight:600;letter-spacing:-.045em;max-width:13em;margin:0 0 20px}
   .cover-subtitle{font-size:1.14rem;color:var(--muted);max-width:40rem;margin:0 0 14px}
   .cover-note{font:.76rem/1.5 var(--mono);color:var(--teal);margin:0}
@@ -209,22 +229,23 @@ CSS = r"""
   .domain strong{display:block;font:600 1.65rem/1 var(--mono);color:var(--ink);margin-bottom:7px}
   .domain span{display:block;font-size:.78rem;line-height:1.3;color:var(--muted)}
 
-  /* Sumário dobrável para 18 capítulos. */
-  .toc{padding:18px 0 64px;border-top:1px solid var(--ink)}
-  .toc h2{font-size:2rem;letter-spacing:-.04em;margin-bottom:9px}
-  .toc-intro{font-size:.95rem;color:var(--muted);margin-bottom:22px}
-  .toc-group{border-top:1px solid var(--line)}
-  .toc-group:last-of-type{border-bottom:1px solid var(--line)}
-  .toc-group summary{cursor:pointer;list-style:none;padding:11px 30px 11px 2px;position:relative;font-weight:600;color:var(--ink)}
-  .toc-group summary::-webkit-details-marker{display:none}
-  .toc-group summary:after{content:'+';position:absolute;right:2px;top:10px;font:500 1.15rem var(--mono);color:var(--teal)}
-  .toc-group[open] summary:after{content:'−'}
-  .toc-group ul{list-style:none;margin:0 0 16px;padding:0 0 0 16px;columns:2;column-gap:32px}
-  .toc-group li{break-inside:avoid;margin:0;padding:3px 0;font-size:.88rem;line-height:1.35}
-  .toc-group li.toc-topic{padding-left:12px;font-size:.82rem}
-  .toc-group li a{text-decoration:none}
-  .toc-group li a:hover{text-decoration:underline}
+  /* Sumário no padrão do ebook Well-Architected: faixa por capítulo, itens numerados em duas colunas. */
+  .toc{padding:40px 0 64px}
+  .toc h2{font-size:1.9rem;letter-spacing:-.04em;padding-bottom:12px;margin-bottom:22px;border-bottom:3px solid var(--ink)}
+  .toc-intro{font-size:.95rem;color:var(--muted);margin:-8px 0 22px}
+  .toc-group+.toc-group{margin-top:10px}
+  .toc-group-title{display:block;list-style:none;cursor:pointer;font:700 .76rem/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);text-decoration:none;background:var(--surface);border-left:4px solid var(--accent);padding:10px 12px;break-after:avoid}
+  .toc-group-title::-webkit-details-marker{display:none}
+  details.toc-group .toc-group-title:after{content:'+';float:right;margin-left:12px;font-size:1rem;line-height:1}
+  details.toc-group[open] .toc-group-title:after{content:'−'}
+  .toc-list{list-style:none;margin:0;padding:8px 10px 0;column-count:2;column-gap:28px}
+  .toc-list li{margin:0;max-width:none;break-inside:avoid}
+  .toc-list a{display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:.88rem;line-height:1.35;color:var(--text);text-decoration:none;border-bottom:1px dotted var(--line)}
+  .toc-list a:hover{color:var(--accent-ink)}
+  .toc-list a .n{font:.74rem var(--mono);color:var(--accent-ink);flex:0 0 3.2em}
+  .toc-list .toc-topic a{padding-left:14px;font-size:.82rem;color:var(--muted)}
   .toc-ending{margin:18px 0 0;font-size:.9rem}
+  .toc-ending a{color:var(--text);text-decoration:none}
 
   /* Capítulos e notas de revisão. */
   .chapter{padding:46px 0 0;margin:0 0 20px;border-top:6px solid var(--ink);break-before:page}
@@ -272,7 +293,7 @@ CSS = r"""
     .cover-code{font-size:clamp(3.2rem,16vw,5rem);margin-bottom:20px}
     .cover-main h1{font-size:2rem}
     .domain-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .toc-group ul{columns:1}
+    .toc-list{column-count:1}
     .chapter{padding-top:34px}
     .chapter>h2{font-size:1.7rem}
     .subchapter>h3{font-size:1.25rem}
@@ -281,7 +302,7 @@ CSS = r"""
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
   @page{size:A4;margin:19mm 17mm 21mm;
-    @bottom-left{content:'SAA-C03  /  GUIA DE REVISÃO';font:8pt 'IBM Plex Mono',monospace;color:#52616d}
+    @bottom-left{content:'SAA-C03  /  GUIA DE REVISÃO  |  Erik Nathan (eriknathan.me · @erik.devops)';font:8pt 'IBM Plex Mono',monospace;color:#52616d}
     @bottom-right{content:counter(page);font:9pt 'IBM Plex Mono',monospace;color:#1b2d3b}
   }
   @page:first{@bottom-left{content:none}@bottom-right{content:none}}
@@ -292,15 +313,20 @@ CSS = r"""
     .book{max-width:none;margin:0;padding:0;box-shadow:none}
     .cover{min-height:235mm;break-after:page;padding-top:18px}
     .cover-code{font-size:62pt}
+    .cover-exam{font-size:10.5pt}
     .cover-main h1{font-size:30pt}
     .cover-subtitle{font-size:12pt}
     .toc{break-after:page}
-    .toc-intro{display:none}
-    .toc-group summary{padding:7px 0 4px;cursor:default}
-    .toc-group summary:after,.toc-group[open] summary:after,
+    .toc{padding:0}
+    .toc-intro,.toc-ending{display:none}
+    .toc h2{font-size:18pt}
+    .toc-group-title{cursor:default;padding:6px 10px;font-size:8pt}
+    details.toc-group .toc-group-title:after,details.toc-group[open] .toc-group-title:after,
     .flashcard summary:after,.flashcard[open] summary:after{content:none}
-    .toc-group ul{display:block!important;margin-bottom:7px}
-    .toc-group li{font-size:8pt;padding:1px 0}
+    .toc-list{display:block!important}
+    .toc-list a{font-size:8.9pt;padding:2px 0}
+    .toc-list a .n{font-size:7.8pt}
+    .toc-list .toc-topic a{font-size:8.3pt}
     .chapter{break-before:page;padding-top:10px;margin:0;border-top:5px solid var(--ink)}
     .chapter>h2{font-size:20pt;margin-bottom:16px;break-after:avoid}
     .subchapter{margin-top:22px;padding-top:15px}
@@ -346,9 +372,10 @@ def build_html(content: str, toc: str, flashcards: int) -> str:
     <div class="cover-top"><span>Guia de estudo</span><span>AWS Certified Solutions Architect – Associate</span></div>
     <div class="cover-main">
       <span class="cover-code">SAA-C03</span>
+      <span class="cover-exam">AWS Certified Solutions Architect – Associate</span>
       <h1>Guia de revisão</h1>
       <p class="cover-subtitle">Computação, armazenamento, redes, segurança e decisões de arquitetura para a revisão da certificação.</p>
-      <p class="cover-note">Feito e criado por Erik Nathan · <a href="https://eriknathan.me/">eriknathan.me</a> · Insta: <a href="https://www.instagram.com/erik.devops/">@erik.devops</a></p>
+      <p class="cover-note">Por Erik Nathan · <a href="https://eriknathan.me/">eriknathan.me</a> · Insta: <a href="https://www.instagram.com/erik.devops/">@erik.devops</a></p>
     </div>
     <div class="cover-bottom">
       <p class="cover-bottom-label">Domínios do exame · pesos apresentados no material</p>

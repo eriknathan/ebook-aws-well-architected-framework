@@ -25,7 +25,7 @@ Os limites e valores numéricos ficam em tabelas **Números de…** dentro do t�
 3. **Compare o sistema inteiro**: uma réplica não substitui backup; um cache não resolve gravações; criptografia não concede autorização; Multi-AZ não protege de falha regional.
 4. **Questões com várias respostas**: confira quantas opções o enunciado pede, avalie cada uma isoladamente e depois valide se o conjunto satisfaz todos os requisitos.
 
-## Domínios do exame SAA-C03 (pesos oficiais)
+### Domínios do exame SAA-C03 (pesos oficiais)
 
 | Domínio | Peso |
 |---|---|
